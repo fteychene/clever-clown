@@ -1,0 +1,16 @@
+[entryPoints]
+  [entryPoints.web]
+    address = ":80"
+
+[providers.docker]
+exposedByDefault = false
+network = "rokku"
+defaultRule = "Host(`{{ index .Labels \"rokku.domain\"}}.${ROKKU_DOMAIN}`)"
+
+[api]
+  dashboard = true
+  insecure = true
+
+[log]
+  level = "DEBUG"
+  noColor = true
