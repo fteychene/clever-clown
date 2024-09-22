@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Error};
+use log::info;
 use model::{Application, Container};
 use port::ContainerExecutor;
 use split_iter::Splittable;
@@ -23,27 +24,36 @@ pub async fn reconcile(event: Event, service: &ReconciliationService) -> Result<
                 .container_executor
                 .register_image(&application)
                 .await?;
-            println!("Application image detected : {}", image_id);
-            let app_containers = service.container_executor.running(application.name.clone()).await?;
+            info!("Application image detected : {}", image_id);
+            let app_containers = service
+                .container_executor
+                .running(application.name.clone())
+                .await?;
             let (outdated_containers, valid_containers) = app_containers
                 .into_iter()
                 .split(|container| container.image_id.eq(&image_id));
             let outdated_containers: Vec<Container> = outdated_containers.collect();
             if !outdated_containers.is_empty() {
-                println!(
+                info!(
                     "Detected {} outdated container runnning. Will be stopped as rolling update",
                     outdated_containers.len()
                 );
             }
             // Could be reintroduced for a down then start rolling strategy
             // for outdated in outdated_containers {
-            //     println!("Detected outdated container running {}. Stopping container...", outdated.id);
+            //     info!("Detected outdated container running {}. Stopping container...", outdated.id);
             //     service.container_executor.stop(&outdated).await?;
             // }
             let mut app_containers: Vec<Container> = valid_containers.collect();
-            let target_replicas = usize::from(application.replicas.unwrap_or(1));
+            let target_replicas = usize::from(
+                application
+                    .configuration
+                    .as_ref()
+                    .and_then(|configuration| configuration.replicas)
+                    .unwrap_or(1),
+            );
             if target_replicas > app_containers.len() {
-                println!(
+                info!(
                     "{} running instances. Starting {} instances",
                     app_containers.len(),
                     target_replicas - app_containers.len()
@@ -54,20 +64,20 @@ pub async fn reconcile(event: Event, service: &ReconciliationService) -> Result<
                         .container_executor
                         .start(&application, image_id.clone())
                         .await?;
-                    println!("Instance {} started", container.id);
+                    info!("Instance {} started", container.id);
                     if let Some(outdated) = outdated_containers.next() {
                         service.container_executor.stop(&outdated).await?;
-                        println!("Outdated instance {} stopped", outdated.id);
+                        info!("Outdated instance {} stopped", outdated.id);
                     }
                 }
                 for outdated in outdated_containers {
                     service.container_executor.stop(&outdated).await?;
-                    println!("Outdated instance {} stopped", outdated.id);
+                    info!("Outdated instance {} stopped", outdated.id);
                 }
             } else if target_replicas == app_containers.len() {
-                println!("Application is up-to-date")
+                info!("Application is up-to-date")
             } else {
-                println!(
+                info!(
                     "{} running instances. Downscaling to {} instances",
                     app_containers.len(),
                     target_replicas
@@ -78,13 +88,16 @@ pub async fn reconcile(event: Event, service: &ReconciliationService) -> Result<
                     .take(app_containers.len() - target_replicas)
                 {
                     service.container_executor.stop(container).await?;
-                    println!("Instance {} deleted", container.id);
+                    info!("Instance {} deleted", container.id);
                 }
             }
             Ok(())
         }
         Event::Destroy(application_name) => {
-            let containers = service.container_executor.running(application_name.clone()).await?;
+            let containers = service
+                .container_executor
+                .running(application_name.clone())
+                .await?;
             if containers.len() < 1 {
                 return Err(anyhow!("Application {} is not running", application_name));
             }
@@ -100,7 +113,11 @@ pub async fn reconcile(event: Event, service: &ReconciliationService) -> Result<
     }
 }
 
-
-pub async fn list_applications(reconciliation_service: &ReconciliationService) -> Result<Vec<String>, Error> {
-    reconciliation_service.container_executor.list_applications().await
+pub async fn list_applications(
+    reconciliation_service: &ReconciliationService,
+) -> Result<Vec<String>, Error> {
+    reconciliation_service
+        .container_executor
+        .list_applications()
+        .await
 }

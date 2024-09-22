@@ -23,11 +23,16 @@ services:
       - 3000:3000
     environment:
       - ROKKU_DOCKER_NETWORK=${COMPOSE_PROJECT_NAME}_rokku
+      - ROKKU_SOURCEDIRECTORY=/var/rokku/workspaces
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - workspaces:/var/rokku/workspaces
     networks:
       - rokku
 
 networks:
   rokku:
     driver: bridge
+
+volumes:
+  workspaces:

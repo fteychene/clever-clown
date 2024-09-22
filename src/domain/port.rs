@@ -1,10 +1,9 @@
+use super::model::{Application, Container};
 use anyhow::Error;
 use async_trait::async_trait;
-use super::model::{Application, Container};
 
 #[async_trait]
 pub trait ContainerExecutor {
-
     async fn register_image(&self, application: &Application) -> Result<String, Error>;
 
     async fn running(&self, application: String) -> Result<Vec<Container>, Error>;

@@ -7,6 +7,7 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
+use log::error;
 
 use crate::domain::{model::Application, reconcile, Event, ReconciliationService};
 
@@ -19,9 +20,11 @@ pub fn router(reconciliation: ReconciliationService) -> Router {
 }
 
 async fn list_applications(State(service): State<Arc<ReconciliationService>>) -> impl IntoResponse {
-    crate::domain::list_applications(&service).await
+    crate::domain::list_applications(&service)
+        .await
         .map(|applications| Json(applications))
         .map_err(|e| {
+            error!("Error during list_application {:?}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Something went wrong: {e}"),
@@ -37,6 +40,7 @@ async fn deploy_application(
         .await
         .map(|_| (StatusCode::OK, "Application deployed"))
         .map_err(|e| {
+            error!("Error during deploy_application {:?}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Something went wrong: {e}"),
@@ -52,6 +56,7 @@ async fn destroy_application(
         .await
         .map(|_| (StatusCode::OK, "Application destoyed"))
         .map_err(|e| {
+            error!("Error during destroy_application {:?}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Something went wrong: {e}"),

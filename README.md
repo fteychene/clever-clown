@@ -9,21 +9,25 @@ For a local docker setup, you can run it with docker compose : `docker compose u
 Since `traefik` is exposing application through domain routing we need to match `*.rokku.local` to localhost.
 On my laptop I use `dnsmasq` for this prupose but you can do as you want. 
 
+Local dev traefik run : `docker run --name rokku-traefik -d -p 8080:8080 -p 80:80 -v /var/run/docker.sock://var/run/docker.sock -v $PWD/traefik/traefik.toml:/etc/traefik/traefik.toml --network=rokku traefik:v3.1`
+
 ## Example
 
 
 Deploy an application 
 ```
 > curl -X POST -H 'Content-Type: application/json' http://localhost:3000/ -d'{
-  "name": "my-github-nginx",
+  "name": "ruby-getting-started",
   "source": {
     "Git": {
-      "remote": "https://github.com/fteychene/useless-willbedeleted.git"
+      "remote": "https://github.com/heroku/ruby-getting-started.git"
     }
   },
-  "domain": "nginx",
-  "exposed_port": 80,
-  "replicas": 3
+  "configuration" : {
+    "domain": "getting-started",
+    "exposed_port": 3000,
+    "replicas": 3
+  }
 }'
 Application deployed
 ```
@@ -31,32 +35,32 @@ Application deployed
 List applications
 ```
 > curl -v http://localhost:3000
-["my-github-nginx"]
+["ruby-getting-started"]
 ```
 
-Check that traefik route request to `nginx.rokku.local` to deployed app
+Check that traefik route request to `getting-started.rokku.local` to deployed app
 ```
-> curl -H 'Host: nginx.rokku.local' http://localhost
-<!doctype html>
+> curl -H 'Host: getting-started.rokku.local' http://localhost
+<!DOCTYPE html>
 <html>
- <body style="backgroud-color:rgb(49, 214, 220);"><center>
-    <head>
-     <title>Application</title>
-    </head>
-    <body>
-     <p>Welcome to my application<p>
-        <p>Today's Date and Time is: <span id='date-time'></span><p>
-        <script>
-             var dateAndTime = new Date();
-             document.getElementById('date-time').innerHTML=dateAndTime.toLocaleString();
-        </script>
-        </body>
+<head>
+  <title>Runy Getting Started on Heroku</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" type="text/css" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" />
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+<script type="text/javascript" src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+<link rel="stylesheet" type="text/css" href="/stylesheets/main.css" />
+
+</head>
+
+<body>
+...
 </html>
 ```
 
 Destroy an application
 ```
-> curl -v -X DELETE http://localhost:3000/my-github-nginx
+> curl -v -X DELETE http://localhost:3000/ruby-getting-started
 Application destoyed
 ```
 

@@ -5,7 +5,7 @@
 [providers.docker]
 exposedByDefault = false
 network = "rokku"
-defaultRule = "Host(`{{ index .Labels \"rokku.domain\"}}.${ROKKU_DOMAIN}`)"
+defaultRule = "Host(`{{ index .Labels \"rokku.domain\"}}.rokku.local`)"
 
 [api]
   dashboard = true

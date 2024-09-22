@@ -1,14 +1,17 @@
 use serde::{Deserialize, Serialize};
 
-
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Application {
     pub name: String,
     pub source: ApplicationSource,
+    pub configuration: Option<ApplicationConfig>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ApplicationConfig {
     pub domain: Option<String>,
     pub exposed_port: Option<u16>,
     pub replicas: Option<u8>,
-    // pub created_at: Instant,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -20,11 +23,13 @@ pub enum ApplicationSource {
     },
     Git {
         remote: String,
+        dockerfile: Option<String>,
         // TODO credentials
     },
     LocalRepo {
-        path: String
-    }
+        path: String,
+        dockerfile: Option<String>,
+    },
 }
 
 #[derive(Clone, Serialize, Deserialize)]
