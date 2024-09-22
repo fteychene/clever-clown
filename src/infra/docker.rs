@@ -52,7 +52,7 @@ impl ContainerExecutor for DockerContainerExecutor {
             .docker
             .list_containers(Some(ListContainersOptions {
                 filters: hash_map! {
-                    "label" => vec![format!("rokku.application.name={}", application_name).as_str()]
+                    "label" => vec![format!("cleverclown.application.name={}", application_name).as_str()]
                 },
                 ..Default::default()
             }))
@@ -183,9 +183,9 @@ impl ContainerExecutor for DockerContainerExecutor {
             }),
             labels: Some(hash_map! {
                 String::from("traefik.enable") => String::from("true"),
-                String::from("traefik.http.services.rokku.loadbalancer.server.port") => format!("{}", exposed_port),
-                String::from("rokku.domain") => application.configuration.as_ref().and_then(|configuration| configuration.domain.clone()).unwrap_or(application.name.clone()),
-                String::from("rokku.application.name") => application.name.clone()
+                String::from("traefik.http.services.cleverclown.loadbalancer.server.port") => format!("{}", exposed_port),
+                String::from("cleverclown.domain") => application.configuration.as_ref().and_then(|configuration| configuration.domain.clone()).unwrap_or(application.name.clone()),
+                String::from("cleverclown.application.name") => application.name.clone()
             }),
             networking_config: Some(NetworkingConfig {
                 endpoints_config: hash_map! {
@@ -250,7 +250,7 @@ impl ContainerExecutor for DockerContainerExecutor {
             .filter_map(|docker_container| {
                 docker_container
                     .labels
-                    .and_then(|labels| labels.get("rokku.application.name").cloned())
+                    .and_then(|labels| labels.get("cleverclown.application.name").cloned())
             })
             .unique()
             .collect())

@@ -1,4 +1,4 @@
-# Rokku
+# Clever clown
 
 An ultra light and minimalist mono machine PaaS written in Rust for teaching purpose.
 
@@ -6,10 +6,10 @@ An ultra light and minimalist mono machine PaaS written in Rust for teaching pur
 
 For a local docker setup, you can run it with docker compose : `docker compose up -d`
 
-Since `traefik` is exposing application through domain routing we need to match `*.rokku.local` to localhost.
+Since `traefik` is exposing application through domain routing we need to match `*.clever.clown` to localhost.
 On my laptop I use `dnsmasq` for this prupose but you can do as you want. 
 
-Local dev traefik run : `docker run --name rokku-traefik -d -p 8080:8080 -p 80:80 -v /var/run/docker.sock://var/run/docker.sock -v $PWD/traefik/traefik.toml:/etc/traefik/traefik.toml --network=rokku traefik:v3.1`
+Local dev traefik run : `docker run --name cleverclown-traefik -d -p 8080:8080 -p 80:80 -v /var/run/docker.sock://var/run/docker.sock -v $PWD/traefik/traefik.toml:/etc/traefik/traefik.toml --network=cleverclown traefik:v3.1`
 
 ## Example
 
@@ -38,9 +38,9 @@ List applications
 ["ruby-getting-started"]
 ```
 
-Check that traefik route request to `getting-started.rokku.local` to deployed app
+Check that traefik route request to `getting-started.clever.clown` to deployed app
 ```
-> curl -H 'Host: getting-started.rokku.local' http://localhost
+> curl -H 'Host: getting-started.clever.clown' http://localhost
 <!DOCTYPE html>
 <html>
 <head>

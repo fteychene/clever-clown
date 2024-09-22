@@ -4,8 +4,8 @@
 
 [providers.docker]
 exposedByDefault = false
-network = "rokku"
-defaultRule = "Host(`{{ index .Labels \"rokku.domain\"}}.rokku.local`)"
+network = "cleverclown"
+defaultRule = "Host(`{{ index .Labels \"cleverclown.domain\"}}.clever.clown`)"
 
 [api]
   dashboard = true

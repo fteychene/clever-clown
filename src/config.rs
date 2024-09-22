@@ -37,7 +37,7 @@ impl Default for DockerConfig {
     fn default() -> Self {
         Self {
             socket: "/var/run/docker.sock".to_string(),
-            network: "rokku".to_string(),
+            network: "cleverclown".to_string(),
         }
     }
 }
@@ -53,7 +53,7 @@ impl Default for HttpConfig {
 
 pub fn load_config() -> Result<AppConfig, Error> {
     let config = Config::builder()
-        .add_source(config::Environment::with_prefix("rokku").separator("_"))
+        .add_source(config::Environment::with_prefix("cleverclown").separator("_"))
         .build()
         .context("Can't load configuration")?;
 

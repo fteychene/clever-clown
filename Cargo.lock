@@ -411,6 +411,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "cleverclown"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "bollard",
+ "bytes",
+ "config",
+ "env_logger",
+ "flate2",
+ "futures",
+ "git2",
+ "itertools",
+ "k8s-openapi",
+ "kube",
+ "log",
+ "map-macro",
+ "rand",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "split-iter",
+ "tar",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "colorchoice"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1959,35 +1988,6 @@ dependencies = [
  "spin",
  "untrusted",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "rokku"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "axum",
- "bollard",
- "bytes",
- "config",
- "env_logger",
- "flate2",
- "futures",
- "git2",
- "itertools",
- "k8s-openapi",
- "kube",
- "log",
- "map-macro",
- "rand",
- "serde",
- "serde_derive",
- "serde_json",
- "split-iter",
- "tar",
- "tokio",
- "uuid",
 ]
 
 [[package]]

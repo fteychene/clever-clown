@@ -13,7 +13,7 @@ mod infra;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    info!("Start Rokku - Your Rust single instance PaaS for learning purpose");
+    info!("Start CleverClown - Your Rust single instance PaaS for learning purpose");
 
     env_logger::builder()
         .filter_level(log::LevelFilter::Info)
@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }),
     };
 
-    info!("Start rokku http server on {}", http_bind);
+    info!("Start cleverclown http server on {}", http_bind);
     let listener = TcpListener::bind(http_bind).await.unwrap();
     axum::serve(listener, router(service)).await?;
     Ok(())

@@ -5,33 +5,33 @@ services:
       - 80:80
       - 8080:8080
     environment:
-      - TRAEFIK_PROVIDERS_DOCKER_NETWORK=${COMPOSE_PROJECT_NAME}_rokku
+      - TRAEFIK_PROVIDERS_DOCKER_NETWORK=${COMPOSE_PROJECT_NAME}_cleverclown
       - TRAEFIK_PROVIDERS_DOCKER_EXPOSEDBYDEFAULT=false
-      - TRAEFIK_PROVIDERS_DOCKER_DEFAULTRULE=Host(`{{ index .Labels "rokku.domain"}}.rokku.local`)
+      - TRAEFIK_PROVIDERS_DOCKER_DEFAULTRULE=Host(`{{ index .Labels "cleverclown.domain"}}.clever.clown`)
       - TRAEFIK_API_INSECURE=true
       - TRAEFIK_LOG_LEVEL=info
       - TRAEFIK_LOG_NOCOLOR=true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
-      - rokku
+      - cleverclown
 
 
-  rokku:
-    image: rokku:latest
+  clever-clown:
+    image: cleverclown:latest
     ports:
       - 3000:3000
     environment:
-      - ROKKU_DOCKER_NETWORK=${COMPOSE_PROJECT_NAME}_rokku
-      - ROKKU_SOURCEDIRECTORY=/var/rokku/workspaces
+      - CLEVERCLOWN_DOCKER_NETWORK=${COMPOSE_PROJECT_NAME}_cleverclown
+      - CLEVERCLOWN_SOURCEDIRECTORY=/var/cleverclown/workspaces
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - workspaces:/var/rokku/workspaces
+      - workspaces:/var/cleverclown/workspaces
     networks:
-      - rokku
+      - cleverclown
 
 networks:
-  rokku:
+  cleverclown:
     driver: bridge
 
 volumes:
