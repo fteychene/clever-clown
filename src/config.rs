@@ -5,7 +5,7 @@ use config::Config;
 #[serde(default)]
 pub struct AppConfig {
     pub docker: DockerConfig,
-    pub http: HttpConfig,
+    pub api: ApiConfig,
     pub sourcedirectory: String, // TODO move to a path to check exists and avoid trailing slashes
 }
 
@@ -18,7 +18,7 @@ pub struct DockerConfig {
 
 #[derive(Debug, Clone, serde_derive::Deserialize, PartialEq, Eq)]
 #[serde(default)]
-pub struct HttpConfig {
+pub struct ApiConfig {
     pub host: String,
     pub port: String,
 }
@@ -27,7 +27,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             docker: Default::default(),
-            http: Default::default(),
+            api: Default::default(),
             sourcedirectory: "/tmp".to_string(),
         }
     }
@@ -42,7 +42,7 @@ impl Default for DockerConfig {
     }
 }
 
-impl Default for HttpConfig {
+impl Default for ApiConfig {
     fn default() -> Self {
         Self {
             host: "0.0.0.0".to_string(),

@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let config = load_config()?;
     info!("Loaded config {:?}", config);
-    let http_bind = format!("{}:{}", config.http.host, config.http.port);
+    let http_bind = format!("{}:{}", config.api.host, config.api.port);
 
     let docker = Docker::connect_with_socket(&config.docker.socket, 120, API_DEFAULT_VERSION)
         .context("Can't connect to docker socket")?;
