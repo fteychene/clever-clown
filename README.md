@@ -4,7 +4,7 @@ An ultra light and minimalist mono machine PaaS written in Rust for teaching pur
 
 ## Usage
 
-## Local docker setup
+### Local docker setup
 
 ```bash
 docker build -t cleverclown:latest .
