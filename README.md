@@ -8,7 +8,6 @@ An ultra light and minimalist mono machine PaaS written in Rust for teaching pur
 
 ```bash
 docker build -t cleverclown:latest .
-docker network create cleverclown
 docker run --name cleverclown -d -p 3000:3000 -v /var/run/docker.sock://var/run/docker.sock --network=cleverclown cleverclown:latest
 ```
 

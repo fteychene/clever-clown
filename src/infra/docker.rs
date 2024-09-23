@@ -9,12 +9,9 @@ use bollard::{
         AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
         ListContainersOptions, LogOutput, NetworkingConfig, RemoveContainerOptions,
         StartContainerOptions, UploadToContainerOptions,
-    },
-    image::{BuildImageOptions, CreateImageOptions},
-    secret::{
+    }, image::{BuildImageOptions, CreateImageOptions}, network::{CreateNetworkOptions, ListNetworksOptions}, secret::{
         BuildInfoAux, CreateImageInfo, EndpointSettings, HostConfig, PortBinding, RestartPolicy, RestartPolicyNameEnum
-    },
-    Docker,
+    }, Docker
 };
 use bytes::{BufMut, BytesMut};
 use flate2::{write::GzEncoder, Compression};
@@ -254,6 +251,19 @@ impl ContainerExecutor for DockerContainerExecutor {
     }
 
     async fn ensure_routing(&self) -> Result<(), Error> {
+        let network = self.docker.list_networks(Some(ListNetworksOptions{
+            filters: hash_map! { "name" => vec![self.config.docker.network.as_str()]}
+        })).await?;
+        
+        if network.is_empty() {
+            info!("Configured network {} is missing. Create network", self.config.docker.network);
+            self.docker.create_network(CreateNetworkOptions {
+                name: self.config.docker.network.as_str(),
+                driver: "bridge",
+                ..Default::default()
+            }).await?;
+        }
+        
         let traefik_container_name = "cleverclown_traefik";
         let container = match self.docker.inspect_container(traefik_container_name, None).await { //TODO should unwrap_or but future on op
             Ok(traefik_container) => {
