@@ -4,11 +4,11 @@ An ultra light and minimalist mono machine PaaS written in Rust for teaching pur
 
 ## Usage
 
-### Local docker setup
+## Local docker setup
 
 ```bash
 docker build -t cleverclown:latest .
-docker run --name cleverclown -d -p 3000:3000 -v /var/run/docker.sock://var/run/docker.sock --network=cleverclown cleverclown:latest
+docker run --name cleverclown -d -p 3000:3000 -v /var/run/docker.sock://var/run/docker.sock cleverclown:latest
 ```
 
 Application are exposed using a [traefik](https://traefik.io/traefik/) container started automatically by cleverclown.
