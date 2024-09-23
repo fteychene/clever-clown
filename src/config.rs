@@ -1,26 +1,35 @@
 use anyhow::{Context, Error};
 use config::Config;
+use serde_derive::Deserialize;
 
-#[derive(Debug, Clone, serde_derive::Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct AppConfig {
     pub docker: DockerConfig,
     pub api: ApiConfig,
     pub sourcedirectory: String, // TODO move to a path to check exists and avoid trailing slashes
+    pub routing: RoutingConfig,
 }
 
-#[derive(Debug, Clone, serde_derive::Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct DockerConfig {
     pub socket: String,
     pub network: String,
 }
 
-#[derive(Debug, Clone, serde_derive::Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct ApiConfig {
     pub host: String,
     pub port: String,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct RoutingConfig {
+    pub domain: String, // TODO check domain is http acceptable domain
+    pub dashboard: bool,
 }
 
 impl Default for AppConfig {
@@ -29,6 +38,7 @@ impl Default for AppConfig {
             docker: Default::default(),
             api: Default::default(),
             sourcedirectory: "/tmp".to_string(),
+            routing: Default::default(),
         }
     }
 }
@@ -47,6 +57,15 @@ impl Default for ApiConfig {
         Self {
             host: "0.0.0.0".to_string(),
             port: 3000.to_string(),
+        }
+    }
+}
+
+impl Default for RoutingConfig {
+    fn default() -> Self {
+        Self {
+            domain: "clever.clown".to_string(), // TODO decide extension cause clown is not a usable TLD 
+            dashboard: true,
         }
     }
 }

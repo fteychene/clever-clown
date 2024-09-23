@@ -1,8 +1,5 @@
 use std::{
-    collections::HashMap,
-    fs::remove_dir_all,
-    path::Path,
-    time::{SystemTime, UNIX_EPOCH},
+    collections::HashMap, fs::remove_dir_all, path::Path, time::{SystemTime, UNIX_EPOCH}
 };
 
 use anyhow::{anyhow, Context, Error};
@@ -15,8 +12,7 @@ use bollard::{
     },
     image::{BuildImageOptions, CreateImageOptions},
     secret::{
-        BuildInfoAux, CreateImageInfo, EndpointSettings, HostConfig, RestartPolicy,
-        RestartPolicyNameEnum,
+        BuildInfoAux, CreateImageInfo, EndpointSettings, HostConfig, PortBinding, RestartPolicy, RestartPolicyNameEnum
     },
     Docker,
 };
@@ -183,6 +179,7 @@ impl ContainerExecutor for DockerContainerExecutor {
             }),
             labels: Some(hash_map! {
                 String::from("traefik.enable") => String::from("true"),
+                format!("traefik.http.routers.{}.rule", application.name) => format!("Host(`{}.{}`)",  application.configuration.as_ref().and_then(|configuration| configuration.domain.clone()).unwrap_or(application.name.clone()), self.config.routing.domain),
                 String::from("traefik.http.services.cleverclown.loadbalancer.server.port") => format!("{}", exposed_port),
                 String::from("cleverclown.domain") => application.configuration.as_ref().and_then(|configuration| configuration.domain.clone()).unwrap_or(application.name.clone()),
                 String::from("cleverclown.application.name") => application.name.clone()
@@ -255,6 +252,71 @@ impl ContainerExecutor for DockerContainerExecutor {
             .unique()
             .collect())
     }
+
+    async fn ensure_routing(&self) -> Result<(), Error> {
+        let traefik_container_name = "cleverclown_traefik";
+        let container = match self.docker.inspect_container(traefik_container_name, None).await { //TODO should unwrap_or but future on op
+            Ok(traefik_container) => {
+                info!("Traefik http routing continer detected {}", traefik_container.id.clone().unwrap());
+                traefik_container
+            }, 
+            Err(_) => { // TODO should check if error is just not existing
+                info!("No routing traefik container detected, starting it");
+                let mut exposed_ports = hash_map! {
+                    "80/tcp".to_string() => HashMap::new(),
+                };
+                let mut port_binding = hash_map! {
+                    "80/tcp".to_string() => Some(vec![PortBinding { host_port: Some("80".to_string()), host_ip: None }])
+                };
+                let mut environment = vec![
+                    format!("TRAEFIK_PROVIDERS_DOCKER_NETWORK={}", self.config.docker.network),
+                    format!("TRAEFIK_PROVIDERS_DOCKER_EXPOSEDBYDEFAULT={}", "false"),
+                    format!("TRAEFIK_LOG_LEVEL={}", "info"),
+                    format!("TRAEFIK_LOG_NOCOLOR={}", "true"),
+                    format!("TRAEFIK_PROVIDERS_DOCKER_ENDPOINT=unix://{}", self.config.docker.socket)
+                ];
+                if self.config.routing.dashboard {
+                    exposed_ports.insert("8080/tcp".to_string(), HashMap::new());
+                    port_binding.insert("8080/tcp".to_string(), Some(vec![PortBinding { host_port: Some("8080".to_string()), host_ip: None }]));
+                    environment.push("TRAEFIK_API_INSECURE=true".to_string());
+                }
+                let traefik_config = Config {
+                    image: Some("traefik:v3.1".to_string()),
+                    env: Some(environment),
+                    exposed_ports: Some(exposed_ports),
+                    host_config: Some(HostConfig {
+                        port_bindings: Some(port_binding),
+                        binds: Some(vec![format!("{}:{}", self.config.docker.socket, self.config.docker.socket)]),
+                        restart_policy: Some(RestartPolicy {
+                            name: Some(RestartPolicyNameEnum::ON_FAILURE),
+                            maximum_retry_count: Some(3),
+                        }),
+                        ..Default::default()
+                    }),
+                    networking_config: Some(NetworkingConfig { endpoints_config: hash_map! { 
+                        self.config.docker.network.clone() => EndpointSettings { ..Default::default() } 
+                    }}), 
+                    ..Default::default()
+                };
+                let container_name = self.docker.create_container(Some(CreateContainerOptions{
+                    name: traefik_container_name,
+                    platform: None,
+                }), traefik_config).await?;
+                info!("Created container {}", container_name.id);
+                self.docker.inspect_container(&container_name.id.as_str(), None).await.context("Error while inspecting newly created traefik container")?
+            }
+        };
+        // TODO should check config is up to date
+        if !container.state.and_then(|state| state.running).unwrap_or(false) {
+            info!("Starting traefik container");
+            self.docker.start_container::<String>(container.id.unwrap().as_str(), None).await.context("Error starting traefik container for routing")
+        } else {
+            Ok(())
+        }
+        
+
+    }
+
 }
 
 impl DockerContainerExecutor {
@@ -387,6 +449,7 @@ impl DockerContainerExecutor {
                 _ => {}
             }
         }
+        self.docker.remove_container(buildpack_container_id.as_str(), None).await?;
         Ok(application_name)
     }
 }

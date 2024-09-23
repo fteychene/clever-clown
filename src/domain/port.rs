@@ -13,4 +13,6 @@ pub trait ContainerExecutor {
     async fn stop(&self, container: &Container) -> Result<(), Error>;
 
     async fn list_applications(&self) -> Result<Vec<String>, Error>;
+
+    async fn ensure_routing(&self) -> Result<(), Error>;
 }

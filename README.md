@@ -4,12 +4,17 @@ An ultra light and minimalist mono machine PaaS written in Rust for teaching pur
 
 ## Usage
 
-For a local docker setup, you can run it with docker compose : `docker compose up -d`
+## Local docker setup
 
+```bash
+docker build -t cleverclown:latest .
+docker network create cleverclown
+docker run --name cleverclown -d -p 3000:3000 -v /var/run/docker.sock://var/run/docker.sock --network=cleverclown cleverclown:latest
+```
+
+Application are exposed using a [traefik](https://traefik.io/traefik/) container started automatically by cleverclown.
 Since `traefik` is exposing application through domain routing we need to match `*.clever.clown` to localhost.
 On my laptop I use `dnsmasq` for this prupose but you can do as you want. 
-
-Local dev traefik run : `docker run --name cleverclown-traefik -d -p 8080:8080 -p 80:80 -v /var/run/docker.sock://var/run/docker.sock -v $PWD/traefik/traefik.toml:/etc/traefik/traefik.toml --network=cleverclown traefik:v3.1`
 
 ## Example
 

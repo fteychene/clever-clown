@@ -34,6 +34,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }),
     };
 
+    service.container_executor.ensure_routing().await?;
+    // Possible feature: gracefully stop routing on shutdown hook with config
+
     info!("Start cleverclown http server on {}", http_bind);
     let listener = TcpListener::bind(http_bind).await.unwrap();
     axum::serve(listener, router(service)).await?;
