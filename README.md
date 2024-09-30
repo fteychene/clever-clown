@@ -2,18 +2,6 @@
 
 An ultra light and minimalist mono machine PaaS written in Rust for teaching purpose.
 
-## Todo
-
-- [ ] Kubernetes image registry
-- [ ] Rework container runtime abstration for Kube/Docker
-- [ ] Runtime configuration selection
-- [ ] Logs / Metrics integration
-- [ ] Container infos with specifics
-- [ ] Retry on deployment error
-- [ ] Local Kind setup with docker network
-- [ ] Environment management
-- [ ] Docker socket full support (not only unix file path)
-
 ## Configuration
 
 ### Common
@@ -120,3 +108,14 @@ Destroy an application
 Application destoyed
 ```
 
+## Todo
+
+- [ ] Kubernetes image registry
+- [ ] Rework container runtime abstration for Kube/Docker
+- [ ] Runtime configuration selection
+- [ ] Logs / Metrics integration
+- [ ] Container infos with specifics
+- [ ] Retry on deployment error
+- [ ] Local Kind setup with docker network
+- [ ] Environment management
+- [ ] Docker socket full support (not only unix file path)
