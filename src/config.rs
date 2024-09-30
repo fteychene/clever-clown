@@ -1,14 +1,16 @@
 use anyhow::{Context, Error};
 use config::Config;
+use log::LevelFilter;
 use serde_derive::Deserialize;
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct AppConfig {
-    pub docker: DockerConfig,
+    pub orchestrator: Orchestrator,
     pub api: ApiConfig,
-    pub sourcedirectory: String, // TODO move to a path to check exists and avoid trailing slashes
     pub routing: RoutingConfig,
+    #[serde(rename(deserialize = "loglevel"))]
+    pub log_level: String,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -16,6 +18,8 @@ pub struct AppConfig {
 pub struct DockerConfig {
     pub socket: String,
     pub network: String,
+    #[serde(rename(deserialize = "sourcedirectory"))]
+    pub source_directory: String, // TODO move to a path to check exists and avoid trailing slashes
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -32,13 +36,25 @@ pub struct RoutingConfig {
     pub dashboard: bool,
 }
 
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct KubernetesConfig {
+    #[serde(rename(deserialize = "appnamespace"))]
+    pub app_namespace: String,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub enum Orchestrator {
+    Docker(DockerConfig),
+    Kubernetes(KubernetesConfig)
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            docker: Default::default(),
+            orchestrator: Orchestrator::Docker(Default::default()),
             api: Default::default(),
-            sourcedirectory: "/tmp".to_string(),
             routing: Default::default(),
+            log_level: LevelFilter::Info.to_string(),
         }
     }
 }
@@ -48,7 +64,14 @@ impl Default for DockerConfig {
         Self {
             socket: "/var/run/docker.sock".to_string(),
             network: "cleverclown".to_string(),
+            source_directory: "/tmp".to_string(),
         }
+    }
+}
+
+impl Default for KubernetesConfig {
+    fn default() -> Self {
+        Self { app_namespace: "default".to_string() }
     }
 }
 
@@ -69,6 +92,9 @@ impl Default for RoutingConfig {
         }
     }
 }
+
+
+
 
 pub fn load_config() -> Result<AppConfig, Error> {
     let config = Config::builder()

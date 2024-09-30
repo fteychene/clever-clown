@@ -2,21 +2,46 @@
 
 An ultra light and minimalist mono machine PaaS written in Rust for teaching purpose.
 
-## Usage
+## Todo
 
-## Local docker setup
+- [ ] Kubernetes image registry
+- [ ] Rework container runtime abstration for Kube/Docker
+- [ ] Runtime configuration selection
+- [ ] Logs / Metrics integration
+- [ ] Container infos with specifics
+- [ ] Retry on deployment error
+- [ ] Local Kind setup with docker network
+
+## Local Usage
+
+Application are exposed using a [traefik](https://traefik.io/traefik/) container started automatically by cleverclown.
+Since `traefik` is exposing application through domain routing we need to match `*.clever.clown` to localhost.
+On my laptop I use `dnsmasq` for this prupose but you can do as you want. 
+
+### Docker setup
 
 ```bash
 docker build -t cleverclown:latest .
 docker run --name cleverclown -d -p 3000:3000 -v /var/run/docker.sock://var/run/docker.sock cleverclown:latest
 ```
 
-Application are exposed using a [traefik](https://traefik.io/traefik/) container started automatically by cleverclown.
-Since `traefik` is exposing application through domain routing we need to match `*.clever.clown` to localhost.
-On my laptop I use `dnsmasq` for this prupose but you can do as you want. 
+### Kind Kubernetes
+
+Setup kubernetes
+```bash
+kind create cluster --name cleverclown --config kind-config.yaml
+kubectl apply -f traefik/
+```
+
+Run application in host network to ease kind communication
+```bash
+docker build -t cleverclown:latest .
+docker run --name cleverclown -d --net=host -v ~/.kube/config:/root/.kube/config -e CLEVERCLOWN_ORCHESTRATOR_KUBERNETES_APPNAMESPACE=default cleverclown:latest
+```
 
 ## Example
 
+:warning: Kubernetes setup only support DockerImage application source
 
 Deploy an application 
 ```

@@ -23,7 +23,7 @@ use map_macro::hash_map;
 use rand::{distributions::Alphanumeric, Rng};
 
 use crate::{
-    config::AppConfig,
+    config::{DockerConfig, RoutingConfig},
     domain::{
         model::{Application, ApplicationSource, Container},
         port::ContainerExecutor,
@@ -31,7 +31,8 @@ use crate::{
 };
 
 pub struct DockerContainerExecutor {
-    pub config: AppConfig,
+    pub docker_config: DockerConfig,
+    pub routing_config: RoutingConfig,
     pub docker: Docker,
 }
 
@@ -110,7 +111,7 @@ impl ContainerExecutor for DockerContainerExecutor {
                 ref remote,
                 ref dockerfile,
             } => {
-                let local_dir = format!("{}/{}", self.config.sourcedirectory, application.name);
+                let local_dir = format!("{}/{}", self.docker_config.source_directory, application.name);
                 if Path::new(local_dir.as_str()).exists() {
                     remove_dir_all(Path::new(local_dir.as_str()))?;
                 }
@@ -151,7 +152,17 @@ impl ContainerExecutor for DockerContainerExecutor {
         }
     }
 
-    async fn start(&self, application: &Application, image_id: String) -> Result<Container, Error> {
+    async fn register_application(&self, application: &Application, _image_id: String) -> Result<Vec<Container>, Error> {
+        // Docker runtime doesn't support application definition
+        self.running(application.name.clone()).await
+    }
+
+    async fn delete_application(&self, _application: String) -> Result<(), Error> {
+        // Docker runtime doesn't support application definition
+        Ok(())
+    }
+
+    async fn start_instance(&self, application: &Application, image_id: String) -> Result<Container, Error> {
         let exposed_port = match application
             .configuration
             .as_ref()
@@ -176,14 +187,14 @@ impl ContainerExecutor for DockerContainerExecutor {
             }),
             labels: Some(hash_map! {
                 String::from("traefik.enable") => String::from("true"),
-                format!("traefik.http.routers.{}.rule", application.name) => format!("Host(`{}.{}`)",  application.configuration.as_ref().and_then(|configuration| configuration.domain.clone()).unwrap_or(application.name.clone()), self.config.routing.domain),
+                format!("traefik.http.routers.{}.rule", application.name) => format!("Host(`{}.{}`)",  application.configuration.as_ref().and_then(|configuration| configuration.domain.clone()).unwrap_or(application.name.clone()), self.routing_config.domain),
                 String::from("traefik.http.services.cleverclown.loadbalancer.server.port") => format!("{}", exposed_port),
                 String::from("cleverclown.domain") => application.configuration.as_ref().and_then(|configuration| configuration.domain.clone()).unwrap_or(application.name.clone()),
                 String::from("cleverclown.application.name") => application.name.clone()
             }),
             networking_config: Some(NetworkingConfig {
                 endpoints_config: hash_map! {
-                    self.config.docker.network.clone() => EndpointSettings {
+                    self.docker_config.network.clone() => EndpointSettings {
                         ..Default::default()
                     }
                 },
@@ -222,7 +233,7 @@ impl ContainerExecutor for DockerContainerExecutor {
         })
     }
 
-    async fn stop(&self, container: &Container) -> Result<(), Error> {
+    async fn stop_instance(&self, _application: String, container: &Container) -> Result<(), Error> {
         self.docker
             .remove_container(
                 container.id.as_str(),
@@ -252,13 +263,13 @@ impl ContainerExecutor for DockerContainerExecutor {
 
     async fn ensure_routing(&self) -> Result<(), Error> {
         let network = self.docker.list_networks(Some(ListNetworksOptions{
-            filters: hash_map! { "name" => vec![self.config.docker.network.as_str()]}
+            filters: hash_map! { "name" => vec![self.docker_config.network.as_str()]}
         })).await?;
         
         if network.is_empty() {
-            info!("Configured network {} is missing. Create network", self.config.docker.network);
+            info!("Configured network {} is missing. Create network", self.docker_config.network);
             self.docker.create_network(CreateNetworkOptions {
-                name: self.config.docker.network.as_str(),
+                name: self.docker_config.network.as_str(),
                 driver: "bridge",
                 ..Default::default()
             }).await?;
@@ -279,13 +290,13 @@ impl ContainerExecutor for DockerContainerExecutor {
                     "80/tcp".to_string() => Some(vec![PortBinding { host_port: Some("80".to_string()), host_ip: None }])
                 };
                 let mut environment = vec![
-                    format!("TRAEFIK_PROVIDERS_DOCKER_NETWORK={}", self.config.docker.network),
+                    format!("TRAEFIK_PROVIDERS_DOCKER_NETWORK={}", self.docker_config.network),
                     format!("TRAEFIK_PROVIDERS_DOCKER_EXPOSEDBYDEFAULT={}", "false"),
                     format!("TRAEFIK_LOG_LEVEL={}", "info"),
                     format!("TRAEFIK_LOG_NOCOLOR={}", "true"),
-                    format!("TRAEFIK_PROVIDERS_DOCKER_ENDPOINT=unix://{}", self.config.docker.socket)
+                    format!("TRAEFIK_PROVIDERS_DOCKER_ENDPOINT=unix://{}", self.docker_config.socket)
                 ];
-                if self.config.routing.dashboard {
+                if self.routing_config.dashboard {
                     exposed_ports.insert("8080/tcp".to_string(), HashMap::new());
                     port_binding.insert("8080/tcp".to_string(), Some(vec![PortBinding { host_port: Some("8080".to_string()), host_ip: None }]));
                     environment.push("TRAEFIK_API_INSECURE=true".to_string());
@@ -296,7 +307,7 @@ impl ContainerExecutor for DockerContainerExecutor {
                     exposed_ports: Some(exposed_ports),
                     host_config: Some(HostConfig {
                         port_bindings: Some(port_binding),
-                        binds: Some(vec![format!("{}:{}", self.config.docker.socket, self.config.docker.socket)]),
+                        binds: Some(vec![format!("{}:{}", self.docker_config.socket, self.docker_config.socket)]),
                         restart_policy: Some(RestartPolicy {
                             name: Some(RestartPolicyNameEnum::ON_FAILURE),
                             maximum_retry_count: Some(3),
@@ -304,7 +315,7 @@ impl ContainerExecutor for DockerContainerExecutor {
                         ..Default::default()
                     }),
                     networking_config: Some(NetworkingConfig { endpoints_config: hash_map! { 
-                        self.config.docker.network.clone() => EndpointSettings { ..Default::default() } 
+                        self.docker_config.network.clone() => EndpointSettings { ..Default::default() } 
                     }}), 
                     ..Default::default()
                 };
@@ -408,7 +419,7 @@ impl DockerContainerExecutor {
             working_dir: Some("/workspace"),
             host_config: Some(HostConfig {
                 binds: Some(vec![
-                    format!("{}:/var/run/docker.sock", self.config.docker.socket),
+                    format!("{}:/var/run/docker.sock", self.docker_config.socket),
                     // format!("{}:/workspace", buildpack_volume), // TODO rework this linking in docker mode
                 ]),
                 ..Default::default()

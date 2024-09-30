@@ -1,0 +1,13 @@
+
+ports:
+  traefik:
+    expose:
+      default: true
+
+ingressRoute:
+  dashboard:
+    enabled: true
+
+service:
+  enabled: false
+
