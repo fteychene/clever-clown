@@ -11,6 +11,33 @@ An ultra light and minimalist mono machine PaaS written in Rust for teaching pur
 - [ ] Container infos with specifics
 - [ ] Retry on deployment error
 - [ ] Local Kind setup with docker network
+- [ ] Environment management
+- [ ] Docker socket full support (not only unix file path)
+
+## Configuration
+
+### Common
+
+| Env var | Default | Description |
+| --- | --- | --- |
+| `CLEVERCLOWN_API_HOST` | `0.0.0.0` | Http api server listening host |
+| `CLEVERCLOWN_API_PORT` | `3000` | Http api server listening port |
+| `CLEVERCLOWN_ROUTING_DOMAIN` | `clever.clown` | Base domain to route application on |
+| `CLEVERCLOWN_LOGLEVEL` | `INFO` | Log level |
+
+### Docker
+
+| Env var | Default | Description |
+| --- | --- | --- |
+| `CLEVERCLOWN_ORCHESTRATOR_DOCKER_SOCKET` | `/var/run/docker.sock` | Unix path to docker socket |
+| `CLEVERCLOWN_ORCHESTRATOR_DOCKER_NETWORK` | `cleverclown` | Docker network for traefik/app communication |
+| `CLEVERCLOWN_ORCHESTRATOR_DOCKER_SOURCEDIRECTORY` | `/tmp` | Directory to clone application git source to |
+
+### Kubernetes
+
+| Env var | Default | Description |
+| --- | --- | --- |
+| `CLEVERCLOWN_ORCHESTRATOR_KUBERNETES_APPNAMESPACE` | `default` | Kubernetes namespace to deploy applications on |
 
 ## Local Usage
 
