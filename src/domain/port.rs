@@ -1,4 +1,4 @@
-use super::model::{Application, Container};
+use super::model::{Application, Container, RunningApplication};
 use anyhow::Error;
 use async_trait::async_trait;
 
@@ -16,7 +16,7 @@ pub trait ContainerExecutor {
 
     async fn stop_instance(&self, application_name: String, container: &Container) -> Result<(), Error>;
 
-    async fn list_applications(&self) -> Result<Vec<String>, Error>;
+    async fn list_applications(&self) -> Result<Vec<RunningApplication>, Error>;
 
     async fn ensure_routing(&self) -> Result<(), Error>;
 }

@@ -1,4 +1,7 @@
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::{
+    collections::HashMap,
+    time::{Instant, SystemTime, UNIX_EPOCH},
+};
 
 use anyhow::{anyhow, Error};
 use axum::async_trait;
@@ -17,7 +20,7 @@ use serde_json::json;
 use crate::{
     config::{KubernetesConfig, RoutingConfig},
     domain::{
-        model::{Application, Container},
+        model::{Application, Container, RunningApplication},
         port::ContainerExecutor,
     },
 };
@@ -35,7 +38,9 @@ impl ContainerExecutor for KubernetesContainerExecutor {
             crate::domain::model::ApplicationSource::DockerImage { ref image, pull: _ } => {
                 Ok(image.clone())
             }
-            _ => Err(anyhow!("Kubernetes runtime only support DockerImage application source")),
+            _ => Err(anyhow!(
+                "Kubernetes runtime only support DockerImage application source"
+            )),
         }
     }
 
@@ -73,6 +78,7 @@ impl ContainerExecutor for KubernetesContainerExecutor {
                     .and_then(|spec| spec.containers.get(0).cloned())
                     .and_then(|container| container.image)
                     .unwrap(),
+                labels: HashMap::new(),
             })
             .collect())
     }
@@ -286,7 +292,9 @@ impl ContainerExecutor for KubernetesContainerExecutor {
             instances = self.running(application.name.clone()).await?;
         }
         if started.elapsed().as_millis() >= 5000 {
-            Err(anyhow!("Deployment registered in Kubernetes but pods aren't detected after 5s"))
+            Err(anyhow!(
+                "Deployment registered in Kubernetes but pods aren't detected after 5s"
+            ))
         } else {
             Ok(instances)
         }
@@ -341,6 +349,7 @@ impl ContainerExecutor for KubernetesContainerExecutor {
                 .duration_since(UNIX_EPOCH)
                 .expect("Time went backward")
                 .as_secs(),
+            labels: HashMap::new(), // TODO should be linked to real labels
         })
     }
 
@@ -352,7 +361,7 @@ impl ContainerExecutor for KubernetesContainerExecutor {
         Ok(())
     }
 
-    async fn list_applications(&self) -> Result<Vec<String>, Error> {
+    async fn list_applications(&self) -> Result<Vec<RunningApplication>, Error> {
         let deployments: Api<Deployment> =
             Api::namespaced(self.client.clone(), &self.kube_config.app_namespace);
         let applications = deployments
@@ -370,7 +379,11 @@ impl ContainerExecutor for KubernetesContainerExecutor {
                     .filter(|labels| labels.contains_key("cleverclown.app"))
                     .is_some()
             })
-            .map(|deployment| deployment.metadata.name.unwrap())
+            .map(|deployment| RunningApplication {
+                name: deployment.metadata.name.unwrap(),
+                domain: "".to_string(),
+                containers: vec![],
+            })
             .collect())
     }
 

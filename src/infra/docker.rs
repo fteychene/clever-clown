@@ -1,5 +1,8 @@
 use std::{
-    collections::HashMap, fs::remove_dir_all, path::Path, time::{SystemTime, UNIX_EPOCH}
+    collections::HashMap,
+    fs::remove_dir_all,
+    path::Path,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use anyhow::{anyhow, Context, Error};
@@ -9,9 +12,14 @@ use bollard::{
         AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
         ListContainersOptions, LogOutput, NetworkingConfig, RemoveContainerOptions,
         StartContainerOptions, UploadToContainerOptions,
-    }, image::{BuildImageOptions, CreateImageOptions}, network::{CreateNetworkOptions, ListNetworksOptions}, secret::{
-        BuildInfoAux, CreateImageInfo, EndpointSettings, HostConfig, PortBinding, RestartPolicy, RestartPolicyNameEnum
-    }, Docker
+    },
+    image::{BuildImageOptions, CreateImageOptions},
+    network::{CreateNetworkOptions, ListNetworksOptions},
+    secret::{
+        BuildInfoAux, ContainerSummary, CreateImageInfo, EndpointSettings, HostConfig, PortBinding,
+        RestartPolicy, RestartPolicyNameEnum,
+    },
+    Docker,
 };
 use bytes::{BufMut, BytesMut};
 use flate2::{write::GzEncoder, Compression};
@@ -25,7 +33,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use crate::{
     config::{DockerConfig, RoutingConfig},
     domain::{
-        model::{Application, ApplicationSource, Container},
+        model::{Application, ApplicationSource, Container, RunningApplication},
         port::ContainerExecutor,
     },
 };
@@ -34,6 +42,26 @@ pub struct DockerContainerExecutor {
     pub docker_config: DockerConfig,
     pub routing_config: RoutingConfig,
     pub docker: Docker,
+}
+
+fn convert_docker_container(summary: &ContainerSummary) -> Container {
+    Container {
+        id: summary
+            .names
+            .as_ref()
+            .and_then(|names| names.first().cloned())
+            .or(summary.id.clone())
+            .unwrap(),
+        image_id: summary.image.clone().unwrap(),
+        started_at: u64::try_from(summary.created.unwrap()).unwrap(),
+        labels: summary
+            .labels
+            .clone()
+            .unwrap_or_else(|| HashMap::new())
+            .into_iter()
+            .filter(|(key, _)| key.starts_with("cleverclown."))
+            .collect(),
+    }
 }
 
 #[async_trait]
@@ -61,7 +89,8 @@ impl ContainerExecutor for DockerContainerExecutor {
                         .and_then(|names| names.first().cloned()))
                     .unwrap_or(application_name.clone()),
                 image_id: docker_container.image.unwrap(),
-                started_at: u64::try_from(docker_container.created.unwrap()).unwrap(), // TODO ???
+                started_at: u64::try_from(docker_container.created.unwrap()).unwrap(),
+                labels: docker_container.labels.unwrap_or_else(|| HashMap::new()), // TODO ???
             })
             .collect())
     }
@@ -94,24 +123,14 @@ impl ContainerExecutor for DockerContainerExecutor {
                             .ok_or(anyhow!("Can't detect id of provided image"))
                     })
             }
-            // ApplicationSource::DockerImage { ref image } => self.docker.create_image(Some(CreateImageOptions{
-            //     from_image: image.as_str(),
-            //     ..Default::default()
-            //   }), None, None).fuse()
-            //   .filter_map(|build_status|
-            //     match build_status.map(|x| x.) {
-            //         Ok(Some(BuildInfoAux::Default(image_id))) => {
-            //             std::future::ready(Some(image_id.id))
-            //         }
-            //         _ => std::future::ready(None),
-            //     }).select_next_some()
-            //     .await
-            //     .ok_or(anyhow!("Error pulling image")),
             ApplicationSource::Git {
                 ref remote,
                 ref dockerfile,
             } => {
-                let local_dir = format!("{}/{}", self.docker_config.source_directory, application.name);
+                let local_dir = format!(
+                    "{}/{}",
+                    self.docker_config.source_directory, application.name
+                );
                 if Path::new(local_dir.as_str()).exists() {
                     remove_dir_all(Path::new(local_dir.as_str()))?;
                 }
@@ -152,7 +171,11 @@ impl ContainerExecutor for DockerContainerExecutor {
         }
     }
 
-    async fn register_application(&self, application: &Application, _image_id: String) -> Result<Vec<Container>, Error> {
+    async fn register_application(
+        &self,
+        application: &Application,
+        _image_id: String,
+    ) -> Result<Vec<Container>, Error> {
         // Docker runtime doesn't support application definition
         self.running(application.name.clone()).await
     }
@@ -162,7 +185,11 @@ impl ContainerExecutor for DockerContainerExecutor {
         Ok(())
     }
 
-    async fn start_instance(&self, application: &Application, image_id: String) -> Result<Container, Error> {
+    async fn start_instance(
+        &self,
+        application: &Application,
+        image_id: String,
+    ) -> Result<Container, Error> {
         let exposed_port = match application
             .configuration
             .as_ref()
@@ -185,12 +212,23 @@ impl ContainerExecutor for DockerContainerExecutor {
                 }),
                 ..Default::default()
             }),
+            env: application
+                .configuration
+                .as_ref()
+                .and_then(|app_config| app_config.env.clone())
+                .map(|env_map| {
+                    env_map
+                        .into_iter()
+                        .map(|(key, val)| format!("{}={}", key, val))
+                        .collect()
+                }),
             labels: Some(hash_map! {
                 String::from("traefik.enable") => String::from("true"),
                 format!("traefik.http.routers.{}.rule", application.name) => format!("Host(`{}.{}`)",  application.configuration.as_ref().and_then(|configuration| configuration.domain.clone()).unwrap_or(application.name.clone()), self.routing_config.domain),
                 String::from("traefik.http.services.cleverclown.loadbalancer.server.port") => format!("{}", exposed_port),
                 String::from("cleverclown.domain") => application.configuration.as_ref().and_then(|configuration| configuration.domain.clone()).unwrap_or(application.name.clone()),
-                String::from("cleverclown.application.name") => application.name.clone()
+                String::from("cleverclown.application.name") => application.name.clone(),
+                String::from("cleverclown.conf.hash") => application.configuration.as_ref().map(|conf| conf.configuration_hash()).unwrap_or_else(|| 0).to_string()
             }),
             networking_config: Some(NetworkingConfig {
                 endpoints_config: hash_map! {
@@ -230,10 +268,22 @@ impl ContainerExecutor for DockerContainerExecutor {
                 .duration_since(UNIX_EPOCH)
                 .expect("Time went backward")
                 .as_secs(),
+            labels: hash_map! {
+                String::from("traefik.enable") => String::from("true"),
+                format!("traefik.http.routers.{}.rule", application.name) => format!("Host(`{}.{}`)",  application.configuration.as_ref().and_then(|configuration| configuration.domain.clone()).unwrap_or(application.name.clone()), self.routing_config.domain),
+                String::from("traefik.http.services.cleverclown.loadbalancer.server.port") => format!("{}", exposed_port),
+                String::from("cleverclown.domain") => application.configuration.as_ref().and_then(|configuration| configuration.domain.clone()).unwrap_or(application.name.clone()),
+                String::from("cleverclown.application.name") => application.name.clone(),
+                String::from("cleverclown.conf.hash") => application.configuration.as_ref().map(|conf| conf.configuration_hash()).unwrap_or_else(|| 0).to_string()
+            },
         })
     }
 
-    async fn stop_instance(&self, _application: String, container: &Container) -> Result<(), Error> {
+    async fn stop_instance(
+        &self,
+        _application: String,
+        container: &Container,
+    ) -> Result<(), Error> {
         self.docker
             .remove_container(
                 container.id.as_str(),
@@ -247,41 +297,83 @@ impl ContainerExecutor for DockerContainerExecutor {
             .context(format!("Error while removing container {}", container.id))
     }
 
-    async fn list_applications(&self) -> Result<Vec<String>, Error> {
+    async fn list_applications(&self) -> Result<Vec<RunningApplication>, Error> {
         let containers = self.docker.list_containers::<String>(None).await?;
 
         Ok(containers
             .into_iter()
-            .filter_map(|docker_container| {
+            .filter(|docker_container| {
                 docker_container
                     .labels
-                    .and_then(|labels| labels.get("cleverclown.application.name").cloned())
+                    .clone()
+                    .unwrap_or_else(|| HashMap::new())
+                    .contains_key("cleverclown.application.name")
             })
-            .unique()
+            .map(|docker_container| convert_docker_container(&docker_container))
+            .into_group_map_by(|container| {
+                container
+                    .labels
+                    .get("cleverclown.application.name")
+                    .cloned()
+                    .unwrap()
+            })
+            .into_iter()
+            .map(|(app_name, containers)| RunningApplication {
+                name: app_name,
+                domain: format!(
+                    "{}.{}",
+                    containers
+                        .first()
+                        .unwrap()
+                        .labels
+                        .get("cleverclown.domain")
+                        .cloned()
+                        .unwrap(),
+                    self.routing_config.domain
+                ),
+                containers,
+            })
             .collect())
     }
 
     async fn ensure_routing(&self) -> Result<(), Error> {
-        let network = self.docker.list_networks(Some(ListNetworksOptions{
-            filters: hash_map! { "name" => vec![self.docker_config.network.as_str()]}
-        })).await?;
-        
+        let network = self
+            .docker
+            .list_networks(Some(ListNetworksOptions {
+                filters: hash_map! { "name" => vec![self.docker_config.network.as_str()]},
+            }))
+            .await?;
+
         if network.is_empty() {
-            info!("Configured network {} is missing. Create network", self.docker_config.network);
-            self.docker.create_network(CreateNetworkOptions {
-                name: self.docker_config.network.as_str(),
-                driver: "bridge",
-                ..Default::default()
-            }).await?;
+            info!(
+                "Configured network {} is missing. Create network",
+                self.docker_config.network
+            );
+            self.docker
+                .create_network(CreateNetworkOptions {
+                    name: self.docker_config.network.as_str(),
+                    driver: "bridge",
+                    ..Default::default()
+                })
+                .await?;
         }
-        
+
         let traefik_container_name = "cleverclown_traefik";
-        let container = match self.docker.inspect_container(traefik_container_name, None).await { //TODO should unwrap_or but future on op
+        let container = match self
+            .docker
+            .inspect_container(traefik_container_name, None)
+            .await
+        {
+            //TODO should unwrap_or but future on op
             Ok(traefik_container) => {
-                info!("Traefik http routing continer detected {}", traefik_container.id.clone().unwrap());
+                info!(
+                    "Traefik http routing continer detected {}",
+                    traefik_container.id.clone().unwrap()
+                );
                 traefik_container
-            }, 
-            Err(_) => { // TODO should check if error is just not existing
+            }
+            Err(_) => {
+                // TODO should check if error is just not existing
                 info!("No routing traefik container detected, starting it");
                 let mut exposed_ports = hash_map! {
                     "80/tcp".to_string() => HashMap::new(),
@@ -290,15 +382,27 @@ impl ContainerExecutor for DockerContainerExecutor {
                     "80/tcp".to_string() => Some(vec![PortBinding { host_port: Some("80".to_string()), host_ip: None }])
                 };
                 let mut environment = vec![
-                    format!("TRAEFIK_PROVIDERS_DOCKER_NETWORK={}", self.docker_config.network),
+                    format!(
+                        "TRAEFIK_PROVIDERS_DOCKER_NETWORK={}",
+                        self.docker_config.network
+                    ),
                     format!("TRAEFIK_PROVIDERS_DOCKER_EXPOSEDBYDEFAULT={}", "false"),
                     format!("TRAEFIK_LOG_LEVEL={}", "info"),
                     format!("TRAEFIK_LOG_NOCOLOR={}", "true"),
-                    format!("TRAEFIK_PROVIDERS_DOCKER_ENDPOINT=unix://{}", self.docker_config.socket)
+                    format!(
+                        "TRAEFIK_PROVIDERS_DOCKER_ENDPOINT=unix://{}",
+                        self.docker_config.socket
+                    ),
                 ];
                 if self.routing_config.dashboard {
                     exposed_ports.insert("8080/tcp".to_string(), HashMap::new());
-                    port_binding.insert("8080/tcp".to_string(), Some(vec![PortBinding { host_port: Some("8080".to_string()), host_ip: None }]));
+                    port_binding.insert(
+                        "8080/tcp".to_string(),
+                        Some(vec![PortBinding {
+                            host_port: Some("8080".to_string()),
+                            host_ip: None,
+                        }]),
+                    );
                     environment.push("TRAEFIK_API_INSECURE=true".to_string());
                 }
                 let traefik_config = Config {
@@ -307,37 +411,55 @@ impl ContainerExecutor for DockerContainerExecutor {
                     exposed_ports: Some(exposed_ports),
                     host_config: Some(HostConfig {
                         port_bindings: Some(port_binding),
-                        binds: Some(vec![format!("{}:{}", self.docker_config.socket, self.docker_config.socket)]),
+                        binds: Some(vec![format!(
+                            "{}:{}",
+                            self.docker_config.socket, self.docker_config.socket
+                        )]),
                         restart_policy: Some(RestartPolicy {
                             name: Some(RestartPolicyNameEnum::ON_FAILURE),
                             maximum_retry_count: Some(3),
                         }),
                         ..Default::default()
                     }),
-                    networking_config: Some(NetworkingConfig { endpoints_config: hash_map! { 
-                        self.docker_config.network.clone() => EndpointSettings { ..Default::default() } 
-                    }}), 
+                    networking_config: Some(NetworkingConfig {
+                        endpoints_config: hash_map! {
+                            self.docker_config.network.clone() => EndpointSettings { ..Default::default() }
+                        },
+                    }),
                     ..Default::default()
                 };
-                let container_name = self.docker.create_container(Some(CreateContainerOptions{
-                    name: traefik_container_name,
-                    platform: None,
-                }), traefik_config).await?;
+                let container_name = self
+                    .docker
+                    .create_container(
+                        Some(CreateContainerOptions {
+                            name: traefik_container_name,
+                            platform: None,
+                        }),
+                        traefik_config,
+                    )
+                    .await?;
                 info!("Created container {}", container_name.id);
-                self.docker.inspect_container(&container_name.id.as_str(), None).await.context("Error while inspecting newly created traefik container")?
+                self.docker
+                    .inspect_container(&container_name.id.as_str(), None)
+                    .await
+                    .context("Error while inspecting newly created traefik container")?
             }
         };
         // TODO should check config is up to date
-        if !container.state.and_then(|state| state.running).unwrap_or(false) {
+        if !container
+            .state
+            .and_then(|state| state.running)
+            .unwrap_or(false)
+        {
             info!("Starting traefik container");
-            self.docker.start_container::<String>(container.id.unwrap().as_str(), None).await.context("Error starting traefik container for routing")
+            self.docker
+                .start_container::<String>(container.id.unwrap().as_str(), None)
+                .await
+                .context("Error starting traefik container for routing")
         } else {
             Ok(())
         }
-        
-
     }
-
 }
 
 impl DockerContainerExecutor {
@@ -442,10 +564,16 @@ impl DockerContainerExecutor {
         tar.append_dir_all(".", local_dir.as_str())?;
         let tar_gz = tar.into_inner()?.finish()?;
 
-        self.docker.upload_to_container(buildpack_container_id.as_str(), Some(UploadToContainerOptions {
-            path: "/workspace",
-            ..Default::default()
-        }), tar_gz.into_inner().freeze()).await?;
+        self.docker
+            .upload_to_container(
+                buildpack_container_id.as_str(),
+                Some(UploadToContainerOptions {
+                    path: "/workspace",
+                    ..Default::default()
+                }),
+                tar_gz.into_inner().freeze(),
+            )
+            .await?;
 
         self.docker
             .start_container::<String>(&buildpack_container_id, None)
@@ -470,7 +598,9 @@ impl DockerContainerExecutor {
                 _ => {}
             }
         }
-        self.docker.remove_container(buildpack_container_id.as_str(), None).await?;
+        self.docker
+            .remove_container(buildpack_container_id.as_str(), None)
+            .await?;
         Ok(application_name)
     }
 }

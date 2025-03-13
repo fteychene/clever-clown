@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Error};
 use log::info;
-use model::{Application, Container};
+use model::{Application, Container, RunningApplication};
 use port::ContainerExecutor;
 use split_iter::Splittable;
 
@@ -31,7 +31,8 @@ pub async fn reconcile(event: Event, service: &ReconciliationService) -> Result<
                 .await?;
             let (outdated_containers, valid_containers) = app_containers
                 .into_iter()
-                .split(|container| container.image_id.eq(&image_id));
+                .split(|container| container.image_id.eq(&image_id) && 
+                container.labels.get("cleverclown.conf.hash").cloned().unwrap_or_else(|| String::from("")).eq(&application.configuration.as_ref().map(|conf| conf.configuration_hash()).unwrap_or_else(|| 0).to_string()));
             let outdated_containers: Vec<Container> = outdated_containers.collect();
             if !outdated_containers.is_empty() {
                 info!(
@@ -128,7 +129,7 @@ pub async fn reconcile(event: Event, service: &ReconciliationService) -> Result<
 
 pub async fn list_applications(
     reconciliation_service: &ReconciliationService,
-) -> Result<Vec<String>, Error> {
+) -> Result<Vec<RunningApplication>, Error> {
     reconciliation_service
         .container_executor
         .list_applications()
