@@ -44,26 +44,6 @@ pub struct DockerContainerExecutor {
     pub docker: Docker,
 }
 
-fn convert_docker_container(summary: &ContainerSummary) -> Container {
-    Container {
-        id: summary
-            .names
-            .as_ref()
-            .and_then(|names| names.first().cloned())
-            .or(summary.id.clone())
-            .unwrap(),
-        image_id: summary.image.clone().unwrap(),
-        started_at: u64::try_from(summary.created.unwrap()).unwrap(),
-        labels: summary
-            .labels
-            .clone()
-            .unwrap_or_else(|| HashMap::new())
-            .into_iter()
-            .filter(|(key, _)| key.starts_with("cleverclown."))
-            .collect(),
-    }
-}
-
 #[async_trait]
 impl ContainerExecutor for DockerContainerExecutor {
     async fn running(
@@ -463,6 +443,7 @@ impl ContainerExecutor for DockerContainerExecutor {
 }
 
 impl DockerContainerExecutor {
+    
     async fn extract_min_exposed_port(&self, image_id: &str) -> Result<u16, Error> {
         self.docker
             .inspect_image(image_id)
@@ -602,5 +583,25 @@ impl DockerContainerExecutor {
             .remove_container(buildpack_container_id.as_str(), None)
             .await?;
         Ok(application_name)
+    }
+}
+
+fn convert_docker_container(summary: &ContainerSummary) -> Container {
+    Container {
+        id: summary
+            .names
+            .as_ref()
+            .and_then(|names| names.first().cloned())
+            .or(summary.id.clone())
+            .unwrap(),
+        image_id: summary.image.clone().unwrap(),
+        started_at: u64::try_from(summary.created.unwrap()).unwrap(),
+        labels: summary
+            .labels
+            .clone()
+            .unwrap_or_else(|| HashMap::new())
+            .into_iter()
+            .filter(|(key, _)| key.starts_with("cleverclown."))
+            .collect(),
     }
 }

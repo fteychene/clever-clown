@@ -37,7 +37,7 @@ On my laptop I use `dnsmasq` for this prupose but you can do as you want.
 
 ```bash
 docker build -t cleverclown:latest .
-docker run --name cleverclown -d -p 3000:3000 -v /var/run/docker.sock://var/run/docker.sock cleverclown:latest
+docker run --name cleverclown -d -p 3000:3000 -v /var/run/docker.sock:/var/run/docker.sock cleverclown:latest
 ```
 
 ### Kind Kubernetes
